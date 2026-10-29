@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Aktionslog{% endblock %}
+{% block content %}
+<div class="werkzeugleiste">
+  <h1>Aktionslog</h1>
+  <span class="leise">neueste zuerst</span>
+</div>
+{% if eintraege %}
+<div class="tabelle-rahmen">
+<table class="tabelle">
+  <thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th>Container</th><th>Ergebnis</th></tr></thead>
+  <tbody>
+  {% for e in eintraege %}
+    <tr class="{% if not e.ok %}zeile-auffaellig{% endif %}">
+      <td data-label="Zeit">{{ e.zeit|zeitstempel }}</td>
+      <td data-label="Benutzer">{{ e.benutzer }}</td>
+      <td data-label="Aktion">{{ ACTIONS.get(e.aktion, e.aktion) }}</td>
+      <td data-label="Container">{{ e.container }}</td>
+      <td data-label="Ergebnis">
+        <span class="punkt punkt-{{ 'gruen' if e.ok else 'rot' }}" aria-hidden="true"></span>{{ e.meldung }}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="leer">Noch keine Aktionen ausgeführt.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,66 @@
+{% macro aktionen(c, ziel="#liste") -%}
+<div class="aktionen">
+  {% if c.protected %}
+    <span class="schild" title="Geschützt: {{ c.protected_reason }}">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5z"/></svg>
+      geschützt
+    </span>
+  {% else %}
+    {% if not c.running %}
+    <button type="button" class="btn btn-klein btn-start"
+            hx-post="/container/{{ c.id }}/start" hx-target="{{ ziel }}" hx-disabled-elt="this"
+            hx-confirm="Container „{{ c.name }}“ starten?">Start</button>
+    {% endif %}
+    {% if c.running %}
+    <button type="button" class="btn btn-klein btn-stop"
+            hx-post="/container/{{ c.id }}/stop" hx-target="{{ ziel }}" hx-disabled-elt="this"
+            hx-confirm="Container „{{ c.name }}“ stoppen?">Stopp</button>
+    {% endif %}
+    <button type="button" class="btn btn-klein"
+            hx-post="/container/{{ c.id }}/restart" hx-target="{{ ziel }}" hx-disabled-elt="this"
+            hx-confirm="Container „{{ c.name }}“ neu starten?">Neustart</button>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro zeile(c) -%}
+<tr class="{% if c.auffaellig %}zeile-auffaellig{% endif %}" data-suche="{{ (c.name ~ ' ' ~ c.project ~ ' ' ~ c.image_name)|lower }}">
+  <td data-label="Name" class="zelle-name">
+    <span class="punkt punkt-{{ c.ampel }}" aria-hidden="true"></span>
+    <a href="/container/{{ c.id }}" title="Details und Logs">{{ c.name }}</a>
+    {% for p in c.problems %}<span class="marke-problem">{{ p }}</span>{% endfor %}
+  </td>
+  <td data-label="Status">{{ c.status_text }}</td>
+  <td data-label="Health" class="health-{{ c.health or 'keine' }}">{{ c.health_text }}</td>
+  <td data-label="Laufzeit">{{ c.laufzeit }}</td>
+  <td data-label="Restarts" class="zahl">{{ c.restart_count }}</td>
+  <td data-label="Image" class="zelle-image" title="{{ c.image_name }}:{{ c.image_tag }}">
+    <span class="image-name">{{ c.image_name }}</span><span class="image-tag">{{ c.image_tag }}</span>
+  </td>
+  <td data-label="Image-Alter">{{ c.image_alter }}</td>
+  <td data-label="CPU" class="zahl">{{ c.cpu_percent|prozent }}</td>
+  <td data-label="RAM" class="zahl" {% if c.mem_limit %}title="von {{ c.mem_limit|bytes }}"{% endif %}>
+    {{ c.mem_usage|bytes }}
+    {% if c.mem_percent is not none %}
+    <meter class="balken" min="0" max="100" low="70" high="90" optimum="0" value="{{ '%.1f'|format(c.mem_percent) }}" aria-label="RAM-Anteil am Limit"></meter>
+    {% endif %}
+  </td>
+  <td data-label="Aktionen">{{ aktionen(c) }}</td>
+</tr>
+{%- endmacro %}
+
+{% macro tabelle(containers) -%}
+<div class="tabelle-rahmen">
+<table class="tabelle">
+  <thead>
+    <tr>
+      <th>Name</th><th>Status</th><th>Health</th><th>Laufzeit</th><th class="zahl">Restarts</th>
+      <th>Image</th><th>Image-Alter</th><th class="zahl">CPU</th><th class="zahl">RAM</th><th><span class="sr">Aktionen</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in containers %}{{ zeile(c) }}{% endfor %}
+  </tbody>
+</table>
+</div>
+{%- endmacro %}

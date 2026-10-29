@@ -1,0 +1,8 @@
+{% if fehler %}
+<p class="meldung meldung-fehler" role="alert">{{ fehler }}</p>
+{% elif not zeilen %}
+<p class="leer">Keine Log-Ausgaben vorhanden.</p>
+{% else %}
+<pre class="log" id="log-ausgabe">{% for z in zeilen %}<span class="log-zeile">{% if z.zeit %}<span class="log-zeit">{{ z.zeit }}</span>{% endif %}{{ z.text }}
+</span>{% endfor %}</pre>
+{% endif %}

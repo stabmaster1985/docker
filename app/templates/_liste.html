@@ -1,0 +1,38 @@
+{% from "_makros.html" import tabelle %}
+{% if toast %}{% include "_toast.html" %}{% endif %}
+
+{% if fehler %}
+<p class="meldung meldung-fehler" role="alert">{{ fehler }}</p>
+{% else %}
+<div class="kennzahlen">
+  <div class="kennzahl"><span class="kennzahl-wert">{{ gesamt }}</span><span class="kennzahl-text">Container</span></div>
+  <div class="kennzahl"><span class="kennzahl-wert">{{ laufend }}</span><span class="kennzahl-text">laufen</span></div>
+  <div class="kennzahl"><span class="kennzahl-wert">{{ gesamt - laufend }}</span><span class="kennzahl-text">gestoppt</span></div>
+  <div class="kennzahl {% if auffaellig %}kennzahl-warnung{% endif %}"><span class="kennzahl-wert">{{ auffaellig|length }}</span><span class="kennzahl-text">auffällig</span></div>
+  <div class="stand leise">Stand {{ stand }}</div>
+</div>
+
+{% if auffaellig %}
+<section class="gruppe gruppe-auffaellig">
+  <h2>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5" class="strich"/></svg>
+    Auffällig
+    <span class="zaehler">{{ auffaellig|length }}</span>
+  </h2>
+  {{ tabelle(auffaellig) }}
+</section>
+{% endif %}
+
+{% for g in gruppen %}
+<details class="gruppe" open data-gruppe="{{ g.name }}">
+  <summary>
+    <h2>{{ g.name }}</h2>
+    <span class="zaehler">{{ g.running_count }}/{{ g.containers|length }} laufen</span>
+    {% if g.problem_count %}<span class="zaehler zaehler-warnung">{{ g.problem_count }} auffällig</span>{% endif %}
+  </summary>
+  {{ tabelle(g.containers) }}
+</details>
+{% else %}
+<p class="leer">Keine Container gefunden.</p>
+{% endfor %}
+{% endif %}

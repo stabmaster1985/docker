@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }}{% endblock %}
+{% block content %}
+<p class="zurueck"><a href="/">← Übersicht</a></p>
+
+<div id="detail-kopf">
+  {% include "_detail_kopf.html" %}
+</div>
+
+<section class="logs-bereich">
+  <div class="werkzeugleiste">
+    <h2>Logs <span class="leise">(letzte {{ tail }} Zeilen)</span></h2>
+    <div class="werkzeuge">
+      <input type="search" id="log-filter" placeholder="Logs filtern …" aria-label="Logs filtern">
+      <span id="log-treffer" class="leise"></span>
+      <label class="schalter"><input type="checkbox" id="log-umbruch" checked><span>Umbruch</span></label>
+      <button type="button" class="btn btn-leise" hx-get="/container/{{ c.id }}/logs"
+              hx-target="#logs" hx-indicator="#lade">Neu laden</button>
+      <span id="lade" class="lade-indikator" aria-hidden="true"></span>
+    </div>
+  </div>
+  <div id="logs">
+    {% include "_logs.html" %}
+  </div>
+</section>
+{% endblock %}

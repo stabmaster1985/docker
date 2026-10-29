@@ -1,0 +1,23 @@
+{% from "_makros.html" import aktionen %}
+{% if toast %}{% include "_toast.html" %}{% endif %}
+<section class="detail-karte {% if c.auffaellig %}zeile-auffaellig{% endif %}">
+  <div class="detail-titel">
+    <span class="punkt punkt-{{ c.ampel }}" aria-hidden="true"></span>
+    <h1>{{ c.name }}</h1>
+    {% for p in c.problems %}<span class="marke-problem">{{ p }}</span>{% endfor %}
+    {{ aktionen(c, ziel="#detail-kopf") }}
+  </div>
+  <dl class="detail-raster">
+    <div><dt>Status</dt><dd>{{ c.status_text }}</dd></div>
+    <div><dt>Health</dt><dd class="health-{{ c.health or 'keine' }}">{{ c.health_text }}</dd></div>
+    <div><dt>Laufzeit</dt><dd>{{ c.laufzeit }}</dd></div>
+    <div><dt>Restarts</dt><dd>{{ c.restart_count }}</dd></div>
+    <div><dt>Image</dt><dd class="umbruch">{{ c.image_name }}:{{ c.image_tag }}</dd></div>
+    <div><dt>Image-Alter</dt><dd>{{ c.image_alter }}</dd></div>
+    <div><dt>CPU</dt><dd>{{ c.cpu_percent|prozent }}</dd></div>
+    <div><dt>RAM</dt><dd>{{ c.mem_usage|bytes }}{% if c.mem_limit %} von {{ c.mem_limit|bytes }}{% endif %}</dd></div>
+    <div><dt>Projekt</dt><dd>{{ c.project or "–" }}{% if c.service %} / {{ c.service }}{% endif %}</dd></div>
+    <div><dt>ID</dt><dd><code>{{ c.short_id }}</code></dd></div>
+    {% if c.protected %}<div><dt>Schutz</dt><dd>{{ c.protected_reason }}</dd></div>{% endif %}
+  </dl>
+</section>

@@ -1,0 +1,87 @@
+name: docker-dashboard
+
+services:
+  # Einziger Dienst mit Zugriff auf den Docker-Socket. Nur im internen Netz
+  # "socket" erreichbar, keine veröffentlichten Ports.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:${SOCKET_PROXY_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      # erlaubt
+      CONTAINERS: 1
+      IMAGES: 1
+      INFO: 1
+      POST: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTARTS: 1
+      # ausdrücklich gesperrt (auch die, die im Image standardmäßig an sind)
+      AUTH: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EVENTS: 0
+      EXEC: 0
+      GRPC: 0
+      NETWORKS: 0
+      NODES: 0
+      PING: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SERVICES: 0
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0
+      VERSION: 0
+      VOLUMES: 0
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket
+    read_only: true
+    tmpfs:
+      - /run
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      dashboard.protect: "true"
+
+  dashboard:
+    build: .
+    image: docker-dashboard:latest
+    restart: unless-stopped
+    depends_on:
+      - socket-proxy
+    env_file: .env
+    environment:
+      DOCKER_HOST: tcp://socket-proxy:2375
+      DATA_DIR: /data
+    ports:
+      # BIND_ADDRESS z. B. auf die LAN- oder Tailscale-IP setzen
+      - "${BIND_ADDRESS:-0.0.0.0}:${DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - dashboard-data:/data
+    networks:
+      - socket
+      - web
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      dashboard.protect: "true"
+
+networks:
+  # internal: kein Weg nach draußen und nicht vom Host aus erreichbar
+  socket:
+    internal: true
+  web: {}
+
+volumes:
+  dashboard-data:
