@@ -1,0 +1,11 @@
+[Unit]
+Description=Docker-Dashboard Update-Dienst: stündlich neue Version vorbereiten
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Unit=dashboard-updater.service
+
+[Install]
+WantedBy=timers.target

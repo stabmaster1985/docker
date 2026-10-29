@@ -17,16 +17,28 @@ import docker
 from docker.errors import APIError, DockerException, NotFound
 
 from . import fmt
-from .config import Settings
 
 log = logging.getLogger("dashboard")
 
 LABEL_PROJECT = "com.docker.compose.project"
 LABEL_SERVICE = "com.docker.compose.service"
+LABEL_WORKDIR = "com.docker.compose.project.working_dir"
 LABEL_HIDE = "dashboard.hide"
 LABEL_PROTECT = "dashboard.protect"
 
 ACTIONS = {"start": "Start", "stop": "Stopp", "restart": "Neustart"}
+# Bezeichnungen fürs Aktionslog (Container-Aktionen und alles andere)
+LOG_ACTIONS = {
+    **ACTIONS,
+    "update": "Update",
+    "update-angefordert": "Update angefordert",
+    "dashboard-update": "Dashboard-Update",
+    "update-pruefung": "Update-Prüfung",
+    "einstellungen": "Einstellungen",
+    "container-einstellung": "Ausblenden/Schützen",
+    "zugang": "Zugangsdaten",
+    "aktionslog": "Aktionslog",
+}
 
 STATUS_TEXT = {
     "running": "läuft",
@@ -78,7 +90,14 @@ class ContainerInfo:
     image_name: str
     image_tag: str
     image_created: datetime | None
+    image_ref: str = ""
+    image_id: str = ""
+    compose_dir: str = ""
     protected_reason: str | None = None
+    protected_fixed: bool = False
+    hidden_reason: str | None = None
+    update: object | None = None  # ImageStatus, wird von main.py gesetzt
+    update_pending: bool = False
     cpu_percent: float | None = None
     mem_usage: int | None = None
     mem_limit: int | None = None
@@ -99,6 +118,11 @@ class ContainerInfo:
     @property
     def auffaellig(self) -> bool:
         return bool(self.problems)
+
+    @property
+    def can_update(self) -> bool:
+        """Aktualisieren geht nur für Compose-Container und nie für geschützte."""
+        return bool(self.project and self.service and self.compose_dir) and not self.protected
 
     @property
     def status_text(self) -> str:
@@ -156,17 +180,16 @@ class Group:
 class RestartTracker:
     """Merkt sich Restart-Zähler über die Zeit, um Restart-Schleifen zu erkennen."""
 
-    def __init__(self, threshold: int, window: int) -> None:
-        self.threshold = threshold
-        self.window = window
+    def __init__(self) -> None:
         self._seen: dict[str, list[tuple[float, int]]] = defaultdict(list)
         self._lock = threading.Lock()
 
-    def observe(self, container_id: str, restart_count: int, now: float | None = None) -> int:
+    def observe(self, container_id: str, restart_count: int, window: int,
+                now: float | None = None) -> int:
         """Speichert eine Beobachtung, gibt die Restarts im Zeitfenster zurück."""
         now = now if now is not None else time.monotonic()
         with self._lock:
-            verlauf = [(t, n) for t, n in self._seen[container_id] if now - t <= self.window]
+            verlauf = [(t, n) for t, n in self._seen[container_id] if now - t <= window]
             # Zähler kann durch manuellen Start auf 0 fallen – dann neu beginnen.
             if verlauf and restart_count < verlauf[-1][1]:
                 verlauf = []
@@ -174,18 +197,19 @@ class RestartTracker:
             self._seen[container_id] = verlauf
             return restart_count - verlauf[0][1]
 
-    def is_loop(self, info: ContainerInfo, now: float | None = None) -> bool:
+    def is_loop(self, info: ContainerInfo, threshold: int, window: int,
+                now: float | None = None) -> bool:
         if info.status == "restarting":
             return True
-        if self.observe(info.id, info.restart_count, now) >= self.threshold:
+        if self.observe(info.id, info.restart_count, window, now) >= threshold:
             return True
         # Ohne Verlauf (z. B. direkt nach Start des Dashboards): viele Restarts
         # und erst kurz wieder oben gilt ebenfalls als Schleife.
         laufzeit = fmt.seit(info.started_at)
         return (
-            info.restart_count >= self.threshold
+            info.restart_count >= threshold
             and laufzeit is not None
-            and laufzeit < self.window
+            and laufzeit < window
         )
 
     def forget_missing(self, ids: set[str]) -> None:
@@ -196,15 +220,15 @@ class RestartTracker:
 
 
 class DockerService:
-    def __init__(self, settings: Settings, client: docker.DockerClient | None = None,
+    def __init__(self, store, client: docker.DockerClient | None = None,
                  hostname: str | None = None) -> None:
-        self.settings = settings
+        self.store = store
         self._client = client
         self._client_lock = threading.Lock()
         self.hostname = hostname or os.environ.get("HOSTNAME") or socket.gethostname()
-        self.restarts = RestartTracker(settings.restart_loop_threshold, settings.restart_loop_window)
+        self.restarts = RestartTracker()
         self._image_cache: dict[str, tuple[str | None, list[str]]] = {}
-        self._pool = ThreadPoolExecutor(max_workers=max(1, settings.stats_workers),
+        self._pool = ThreadPoolExecutor(max_workers=max(1, store.base.stats_workers),
                                         thread_name_prefix="stats")
         self.own_id: str | None = None
         self.own_project: str | None = None
@@ -215,11 +239,12 @@ class DockerService:
     def client(self) -> docker.DockerClient:
         with self._client_lock:
             if self._client is None:
+                s = self.store.base
                 self._client = docker.DockerClient(
-                    base_url=self.settings.docker_host,
-                    version=self.settings.docker_api_version,
-                    timeout=self.settings.docker_timeout,
-                    max_pool_size=self.settings.stats_workers + 4,
+                    base_url=s.docker_host,
+                    version=s.docker_api_version,
+                    timeout=s.docker_timeout,
+                    max_pool_size=s.stats_workers + 4,
                 )
             return self._client
 
@@ -241,16 +266,38 @@ class DockerService:
                 self._image_cache[image_id] = (None, [])
         return self._image_cache[image_id]
 
-    def _protection(self, attrs: dict, labels: dict, image_ref: str) -> str | None:
-        if _truthy(labels.get(LABEL_PROTECT)):
-            return "per Label geschützt"
+    def image_attrs(self, ref: str) -> dict | None:
+        """Lokales Image zu einer Referenz (für die Update-Prüfung)."""
+        try:
+            return self.client.images.get(ref).attrs
+        except NotFound:
+            return None
+
+    def _protection(self, attrs: dict, labels: dict, image_ref: str,
+                    name: str) -> tuple[str | None, bool]:
+        """(Grund, fest) – „fest“ heißt: in der Oberfläche nicht abschaltbar."""
         if attrs["Id"] == self.own_id:
-            return "das Dashboard selbst"
+            return "das Dashboard selbst", True
         if self.own_project and labels.get(LABEL_PROJECT) == self.own_project:
-            return "Teil des Dashboard-Stacks"
+            return "Teil des Dashboard-Stacks", True
         if "docker-socket-proxy" in image_ref:
-            return "Socket-Proxy"
+            return "Socket-Proxy", True
+        if _truthy(labels.get(LABEL_PROTECT)):
+            return "per Label geschützt", True
+        if name in self.store.protected_names:
+            return "in den Einstellungen geschützt", False
+        return None, False
+
+    def _hidden(self, c) -> str | None:
+        if _truthy((c.labels or {}).get(LABEL_HIDE)):
+            return "per Label"
+        if self._name(c) in self.store.hidden_names:
+            return "in den Einstellungen"
         return None
+
+    @staticmethod
+    def _name(c) -> str:
+        return (c.attrs.get("Name") or c.name or c.id[:12]).lstrip("/")
 
     def _detect_self(self, containers: list) -> None:
         self._self_checked = True
@@ -266,11 +313,13 @@ class DockerService:
         labels = c.labels or {}
         image_ref = attrs.get("Config", {}).get("Image") or ""
         created, repo_tags = self._image_meta(attrs.get("Image", ""))
-        if not image_ref or image_ref.startswith("sha256:"):
-            image_ref = repo_tags[0] if repo_tags else image_ref[:19]
-        image_name, image_tag = split_image(image_ref)
-        name = (attrs.get("Name") or c.name or c.id[:12]).lstrip("/")
+        anzeige_ref = image_ref
+        if not anzeige_ref or anzeige_ref.startswith("sha256:"):
+            anzeige_ref = repo_tags[0] if repo_tags else anzeige_ref[:19]
+        image_name, image_tag = split_image(anzeige_ref)
+        name = self._name(c)
         health = (state.get("Health") or {}).get("Status")
+        schutz, schutz_fest = self._protection(attrs, labels, image_ref, name)
 
         info = ContainerInfo(
             id=c.id,
@@ -286,18 +335,24 @@ class DockerService:
             image_name=image_name,
             image_tag=image_tag,
             image_created=fmt.parse_docker_time(created),
-            protected_reason=self._protection(attrs, labels, image_ref),
+            image_ref=image_ref,
+            image_id=attrs.get("Image", ""),
+            compose_dir=labels.get(LABEL_WORKDIR, ""),
+            protected_reason=schutz,
+            protected_fixed=schutz_fest,
+            hidden_reason=self._hidden(c),
         )
         info.problems = self._problems(info)
         return info
 
     def _problems(self, info: ContainerInfo) -> list[str]:
+        s = self.store.s
         probleme = []
-        if self.restarts.is_loop(info):
+        if self.restarts.is_loop(info, s.restart_loop_threshold, s.restart_loop_window):
             probleme.append("Restart-Schleife")
         if info.status == "dead":
             probleme.append("tot")
-        if info.status == "exited" and not (self.settings.ignore_exit_zero and info.exit_code == 0):
+        if info.status == "exited" and not (s.ignore_exit_zero and info.exit_code == 0):
             probleme.append(f"beendet (Code {info.exit_code})")
         if info.health == "unhealthy":
             probleme.append("ungesund")
@@ -311,7 +366,8 @@ class DockerService:
             return None, None, None
         return compute_cpu(s), *compute_mem(s)
 
-    def list_containers(self, with_stats: bool = True) -> list[ContainerInfo]:
+    def list_containers(self, with_stats: bool = True,
+                        include_hidden: bool = False) -> list[ContainerInfo]:
         try:
             raw = self.client.containers.list(all=True)
         except (APIError, DockerException, OSError) as exc:
@@ -319,7 +375,7 @@ class DockerService:
 
         if not self._self_checked:
             self._detect_self(raw)
-        sichtbar = [c for c in raw if not _truthy((c.labels or {}).get(LABEL_HIDE))]
+        sichtbar = raw if include_hidden else [c for c in raw if not self._hidden(c)]
         infos = [self._to_info(c) for c in sichtbar]
         self.restarts.forget_missing({c.id for c in raw})
 
@@ -338,16 +394,16 @@ class DockerService:
             raise DashboardError("Container nicht gefunden.") from exc
         except (APIError, DockerException, OSError) as exc:
             raise DashboardError(f"Docker nicht erreichbar: {exc}") from exc
-        if _truthy((c.labels or {}).get(LABEL_HIDE)):
+        if self._hidden(c):
             raise DashboardError("Container nicht gefunden.")
         return c
 
-    def get(self, container_id: str) -> ContainerInfo:
+    def get(self, container_id: str, with_stats: bool = True) -> ContainerInfo:
         if not self._self_checked:
             self.list_containers(with_stats=False)
         c = self._get_visible(container_id)
         info = self._to_info(c)
-        if info.status == "running":
+        if with_stats and info.status == "running":
             info.cpu_percent, info.mem_usage, info.mem_limit = self._stats(c)
         return info
 

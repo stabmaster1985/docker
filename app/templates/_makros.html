@@ -1,3 +1,15 @@
+{% macro update_knopf(c, ziel="#liste") -%}
+{% if c.update and c.update.hat_update and c.can_update and updater_ok %}
+  {% if c.update_pending %}
+  <span class="schild">Update läuft …</span>
+  {% else %}
+  <button type="button" class="btn btn-klein btn-update"
+          hx-post="/container/{{ c.id }}/update" hx-target="{{ ziel }}" hx-disabled-elt="this"
+          hx-confirm="Container „{{ c.name }}“ aktualisieren? Das neue Image wird geladen und der Container neu erstellt. Startet er nicht sauber, kommt automatisch die alte Version zurück.">Update</button>
+  {% endif %}
+{% endif %}
+{%- endmacro %}
+
 {% macro aktionen(c, ziel="#liste") -%}
 <div class="aktionen">
   {% if c.protected %}
@@ -16,11 +28,16 @@
             hx-post="/container/{{ c.id }}/stop" hx-target="{{ ziel }}" hx-disabled-elt="this"
             hx-confirm="Container „{{ c.name }}“ stoppen?">Stopp</button>
     {% endif %}
+    {{ update_knopf(c, ziel) }}
     <button type="button" class="btn btn-klein"
             hx-post="/container/{{ c.id }}/restart" hx-target="{{ ziel }}" hx-disabled-elt="this"
             hx-confirm="Container „{{ c.name }}“ neu starten?">Neustart</button>
   {% endif %}
 </div>
+{%- endmacro %}
+
+{% macro update_marke(c) -%}
+{% if c.update and c.update.hat_update %}<a class="marke-update" href="/updates" title="{{ c.update.text }}">{{ "Update" if c.update.code == "update" else "Neustart nötig" }}</a>{% endif %}
 {%- endmacro %}
 
 {% macro zeile(c) -%}
@@ -29,6 +46,7 @@
     <span class="punkt punkt-{{ c.ampel }}" aria-hidden="true"></span>
     <a href="/container/{{ c.id }}" title="Details und Logs">{{ c.name }}</a>
     {% for p in c.problems %}<span class="marke-problem">{{ p }}</span>{% endfor %}
+    {{ update_marke(c) }}
   </td>
   <td data-label="Status">{{ c.status_text }}</td>
   <td data-label="Health" class="health-{{ c.health or 'keine' }}">{{ c.health_text }}</td>

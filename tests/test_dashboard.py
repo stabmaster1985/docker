@@ -2,7 +2,7 @@ import json
 
 from app import fmt
 from app.docker_service import RestartTracker, compute_cpu, compute_mem, split_image
-from tests.conftest import csrf_from, login
+from tests.conftest import csrf_from, hx, login
 
 
 # ------------------------------------------------------------------ Login
@@ -45,7 +45,8 @@ def test_sicherheitsheader(client):
 
 
 def test_healthz_ohne_login(client):
-    assert client.get("/healthz").json() == {"status": "ok", "docker": True}
+    daten = client.get("/healthz").json()
+    assert daten["status"] == "ok" and daten["docker"] is True
 
 
 # -------------------------------------------------------------- Übersicht
@@ -86,15 +87,15 @@ def test_aktion_auf_geschuetzten_container_verweigert(client, containers):
     login(client)
     csrf = csrf_from(client.get("/").text)
     for cid in ("dash", "proxy", "prot"):
-        r = client.post(f"/container/{cid}/stop", headers={"X-CSRF-Token": csrf})
-        assert "geschützt" in r.text
+        r = client.post(f"/container/{cid}/stop", headers=hx(csrf))
+        assert "ist geschützt (" in r.text
     assert all(not c.calls for c in containers)
 
 
 def test_aktion_auf_ausgeblendeten_container_verweigert(client, containers):
     login(client)
     csrf = csrf_from(client.get("/").text)
-    r = client.post("/container/secret/stop", headers={"X-CSRF-Token": csrf})
+    r = client.post("/container/secret/stop", headers=hx(csrf))
     assert "nicht gefunden" in r.text
     assert client.get("/container/secret").status_code == 200  # Fehlerseite
     assert next(c for c in containers if c.name == "geheim").calls == []
@@ -107,10 +108,10 @@ def test_aktion_ohne_csrf_abgelehnt(client, containers):
     assert next(c for c in containers if c.name == "immich-server").calls == []
 
 
-def test_aktion_wird_ausgefuehrt_und_geloggt(client, containers, settings, tmp_path):
+def test_aktion_wird_ausgefuehrt_und_geloggt(client, containers, tmp_path):
     login(client)
     csrf = csrf_from(client.get("/").text)
-    r = client.post("/container/web/restart", headers={"X-CSRF-Token": csrf})
+    r = client.post("/container/web/restart", headers=hx(csrf))
     assert r.status_code == 200 and "neu gestartet" in r.text and 'id="toasts"' not in r.text
     assert next(c for c in containers if c.name == "immich-server").calls == ["restart"]
 
@@ -122,7 +123,7 @@ def test_aktion_wird_ausgefuehrt_und_geloggt(client, containers, settings, tmp_p
 def test_unbekannte_aktion(client, containers):
     login(client)
     csrf = csrf_from(client.get("/").text)
-    r = client.post("/container/web/kill", headers={"X-CSRF-Token": csrf})
+    r = client.post("/container/web/kill", headers=hx(csrf))
     assert "Unbekannte Aktion" in r.text
     assert next(c for c in containers if c.name == "immich-server").calls == []
 
@@ -137,12 +138,12 @@ def test_detail_mit_logs(client):
 
 # ------------------------------------------------------------------ Hilfen
 def test_restart_tracker():
-    t = RestartTracker(threshold=3, window=600)
-    assert t.observe("a", 1, now=0) == 0
-    assert t.observe("a", 3, now=100) == 2
-    assert t.observe("a", 4, now=200) == 3
-    assert t.observe("a", 5, now=700) == 2  # Beobachtung bei t=0 ist aus dem Fenster gefallen
-    assert t.observe("a", 0, now=950) == 0  # Zähler zurückgesetzt
+    t = RestartTracker()
+    assert t.observe("a", 1, 600, now=0) == 0
+    assert t.observe("a", 3, 600, now=100) == 2
+    assert t.observe("a", 4, 600, now=200) == 3
+    assert t.observe("a", 5, 600, now=700) == 2  # Beobachtung bei t=0 ist aus dem Fenster gefallen
+    assert t.observe("a", 0, 600, now=950) == 0  # Zähler zurückgesetzt
 
 
 def test_split_image():

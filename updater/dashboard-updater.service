@@ -1,0 +1,10 @@
+[Unit]
+Description=Docker-Dashboard Update-Dienst (Aufträge abarbeiten, neue Version vorbereiten)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=DASH_DIR=@DIR@
+ExecStart=/usr/bin/env bash @DIR@/updater/dashboard-updater.sh handle
+TimeoutStartSec=60min

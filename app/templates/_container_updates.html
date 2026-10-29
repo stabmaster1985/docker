@@ -1,0 +1,73 @@
+{% from "_makros.html" import update_knopf with context %}
+{% if request.headers.get("HX-Request") %}
+{% if toast %}{% include "_toast.html" %}{% endif %}
+{% for t in toasts %}{% with toast = t %}{% include "_toast.html" %}{% endwith %}{% endfor %}
+{% endif %}
+<section class="karte"
+  {% if beschaeftigt %}hx-get="/partials/container-updates" hx-trigger="every 5s" hx-target="#container-updates"{% endif %}>
+  <div class="karte-kopf">
+    <h2>Container-Images</h2>
+    <div class="werkzeuge">
+      <span class="leise">
+        {% if pruefung_laeuft %}Prüfung läuft …
+        {% elif letzte_pruefung %}Zuletzt geprüft {{ letzte_pruefung|zeitstempel }}
+        {% else %}Noch nicht geprüft{% endif %}
+        {% if not s.update_check %} · automatische Prüfung aus{% endif %}
+      </span>
+      <button type="button" class="btn" hx-post="/updates/images/pruefen" hx-target="#container-updates"
+              {% if pruefung_laeuft %}disabled{% endif %}>Jetzt prüfen</button>
+    </div>
+  </div>
+  <p class="leise klein">
+    Geprüft wird, ob der Tag eines Images (z. B. <code>:latest</code> oder <code>:16</code>) in der Registry auf einen
+    neueren Stand zeigt. Heruntergeladen wird dabei nichts. „Update“ lädt das neue Image und erstellt den Container
+    über sein Compose-Projekt neu; startet er nicht sauber, kommt die alte Version zurück.
+    {% if not updater_ok %}<strong>Dafür muss der Update-Dienst eingerichtet sein (siehe oben).</strong>{% endif %}
+  </p>
+
+  {% if fehler %}
+  <p class="meldung meldung-fehler">{{ fehler }}</p>
+  {% else %}
+  <div class="tabelle-rahmen">
+  <table class="tabelle">
+    <thead><tr><th>Container</th><th>Image</th><th>Stand</th><th>Geprüft</th><th><span class="sr">Aktion</span></th></tr></thead>
+    <tbody>
+    {% for c in container %}
+      <tr class="{% if c.update.hat_update %}zeile-update{% endif %}">
+        <td data-label="Container" class="zelle-name">
+          <a href="/container/{{ c.id }}">{{ c.name }}</a>
+          {% if c.project %}<span class="leise klein">{{ c.project }}</span>{% endif %}
+        </td>
+        <td data-label="Image" class="zelle-image"><span class="image-name">{{ c.image_name }}</span><span class="image-tag">{{ c.image_tag }}</span></td>
+        <td data-label="Stand" class="update-{{ c.update.code }}">{{ c.update.text }}</td>
+        <td data-label="Geprüft">{{ c.update.geprueft|zeitstempel if c.update.geprueft else "–" }}</td>
+        <td data-label="Aktion">
+          {% if c.update.hat_update %}
+            {% if c.protected %}<span class="schild" title="{{ c.protected_reason }}">geschützt</span>
+            {% elif not c.can_update %}<span class="leise klein">kein Compose-Projekt</span>
+            {% else %}<div class="aktionen">{{ update_knopf(c, ziel="#container-updates") }}</div>{% endif %}
+          {% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="leer">Keine Container.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if jobs %}
+  <h3>Letzte Update-Aufträge</h3>
+  <ul class="jobs">
+    {% for j in jobs %}
+    <li class="job-{{ j.phase }}">
+      <span class="punkt punkt-{{ 'gruen' if j.phase == 'fertig' else ('rot' if j.phase == 'fehler' else 'gelb') }}" aria-hidden="true"></span>
+      <span class="leise">{{ j.zeit|zeitstempel }}</span>
+      <strong>{{ j.name or j.container[:12] }}</strong>
+      {{ j.meldung }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>

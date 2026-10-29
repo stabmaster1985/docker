@@ -10,8 +10,12 @@ from docker.errors import NotFound
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.docker_service import DockerService
 from app.main import create_app
+
+
+def hex_id(kurz: str) -> str:
+    """Echte Container-IDs sind 64 Hex-Zeichen – „web“ wird zu 776562000…"""
+    return kurz.encode().hex().ljust(64, "0")
 
 
 def iso(dt: datetime) -> str:
@@ -20,9 +24,11 @@ def iso(dt: datetime) -> str:
 
 class FakeContainer:
     def __init__(self, cid, name, status="running", labels=None, image="nginx:1.27",
-                 health=None, restart_count=0, exit_code=0, started_ago=3600, hostname=None):
+                 health=None, restart_count=0, exit_code=0, started_ago=3600, hostname=None,
+                 image_id=None):
         jetzt = datetime.now(timezone.utc)
-        self.id = cid.ljust(64, "0")
+        self.short = cid
+        self.id = hex_id(cid)
         self.name = name
         self.labels = labels or {}
         self.calls: list[str] = []
@@ -39,7 +45,7 @@ class FakeContainer:
             "Name": "/" + name,
             "State": state,
             "RestartCount": restart_count,
-            "Image": "sha256:img-" + image,
+            "Image": image_id or "sha256:img-" + image,
             "Config": {"Image": image, "Labels": self.labels, "Hostname": hostname or self.id[:12]},
         }
 
@@ -67,8 +73,9 @@ class FakeContainer:
 
 
 class FakeImage:
-    def __init__(self, created):
-        self.attrs = {"Created": created, "RepoTags": []}
+    def __init__(self, created, image_id="", repo_digests=None):
+        self.attrs = {"Id": image_id, "Created": created, "RepoTags": [],
+                      "RepoDigests": repo_digests or []}
 
 
 class FakeContainers:
@@ -80,14 +87,24 @@ class FakeContainers:
 
     def get(self, cid):
         for c in self.items.values():
-            if c.id == cid or c.id.startswith(cid) or c.name == cid:
+            if c.id == cid or c.id.startswith(cid) or c.name == cid or c.short == cid:
                 return c
         raise NotFound("nicht da")
 
 
 class FakeImages:
-    def get(self, image_id):
-        return FakeImage(iso(datetime.now(timezone.utc) - timedelta(days=95)))
+    """Image-ID „sha256:img-<ref>“; RepoDigests aus self.digests[ref]."""
+
+    def __init__(self):
+        self.digests: dict[str, list[str]] = {}
+        self.ids: dict[str, str] = {}
+
+    def get(self, name):
+        alt = iso(datetime.now(timezone.utc) - timedelta(days=95))
+        if name.startswith("sha256:"):
+            return FakeImage(alt, name)
+        image_id = self.ids.get(name, "sha256:img-" + name)
+        return FakeImage(alt, image_id, self.digests.get(name, []))
 
 
 class FakeClient:
@@ -103,13 +120,17 @@ def default_containers():
     return [
         FakeContainer("dash", "docker-dashboard-dashboard-1",
                       labels={"com.docker.compose.project": "docker-dashboard",
-                              "com.docker.compose.service": "dashboard"},
+                              "com.docker.compose.service": "dashboard",
+                              "com.docker.compose.project.working_dir": "/opt/docker-dashboard"},
                       image="docker-dashboard:latest"),
         FakeContainer("proxy", "docker-dashboard-socket-proxy-1",
                       labels={"com.docker.compose.project": "docker-dashboard"},
                       image="tecnativa/docker-socket-proxy:latest"),
         FakeContainer("web", "immich-server",
-                      labels={"com.docker.compose.project": "immich"}, image="ghcr.io/immich-app/immich-server:v2.1.0"),
+                      labels={"com.docker.compose.project": "immich",
+                              "com.docker.compose.service": "immich-server",
+                              "com.docker.compose.project.working_dir": "/opt/immich"},
+                      image="ghcr.io/immich-app/immich-server:v2.1.0"),
         FakeContainer("db", "immich-db", status="exited", exit_code=1,
                       labels={"com.docker.compose.project": "immich"}, image="postgres:16"),
         FakeContainer("sick", "paperless", health="unhealthy",
@@ -126,6 +147,7 @@ BASE_SETTINGS = Settings(
     docker_api_version="1.44", docker_timeout=5, data_dir="/tmp", action_log_max=100,
     refresh_seconds=15, log_tail=200, restart_loop_threshold=3, restart_loop_window=600,
     ignore_exit_zero=False, login_max_attempts=3, login_lock_seconds=60, stats_workers=2,
+    update_check=True, update_check_hours=6,
 )
 
 
@@ -140,14 +162,19 @@ def containers():
 
 
 @pytest.fixture
-def service(settings, containers):
-    # Hostname = Kurz-ID des Dashboard-Containers, wie in Docker üblich.
-    return DockerService(settings, client=FakeClient(containers), hostname="dash00000000")
+def fake_client(containers):
+    return FakeClient(containers)
 
 
 @pytest.fixture
-def app(settings, service):
-    return create_app(settings, service)
+def app(settings, fake_client):
+    # Hostname = Kurz-ID des Dashboard-Containers, wie in Docker üblich.
+    return create_app(settings, client=fake_client, hostname=hex_id("dash")[:12], background=False)
+
+
+@pytest.fixture
+def service(app):
+    return app.state.service
 
 
 @pytest.fixture
@@ -164,3 +191,8 @@ def login(client: TestClient, user="admin", password="geheim123"):
 
 def csrf_from(html: str) -> str:
     return html.split('"X-CSRF-Token": "')[1].split('"')[0]
+
+
+def hx(csrf: str) -> dict[str, str]:
+    """Header wie bei einer htmx-Anfrage."""
+    return {"X-CSRF-Token": csrf, "HX-Request": "true"}
