@@ -1,0 +1,9 @@
+[Unit]
+Description=Docker-Dashboard Update-Dienst: Auftrag aus der App
+
+[Path]
+PathExistsGlob=@DIR@/data/updater/auftraege/*.json
+Unit=dashboard-updater.service
+
+[Install]
+WantedBy=multi-user.target

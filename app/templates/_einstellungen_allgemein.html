@@ -1,0 +1,35 @@
+{% if toast %}{% include "_toast.html" %}{% endif %}
+<section class="karte">
+  <div class="karte-kopf"><h2>Allgemein</h2></div>
+  {% if formfehler %}
+  <ul class="meldung meldung-fehler">{% for f in formfehler %}<li>{{ f }}</li>{% endfor %}</ul>
+  {% endif %}
+  <form class="formular-raster" hx-post="/einstellungen/allgemein" hx-target="#einstellungen-allgemein">
+    {% for gruppe, felder in feldgruppen.items() %}
+    <fieldset>
+      <legend>{{ gruppe }}</legend>
+      {% for f in felder %}
+        {% if f.typ.__name__ == "bool" %}
+        <label class="schalter schalter-feld">
+          <input type="checkbox" name="{{ f.key }}" {% if store.anzeige_wert(f.key) %}checked{% endif %}>
+          <span>{{ f.titel }}{% if store.from_gui(f.key) %} <span class="marke-gui" title=".env: {{ 'an' if store.env_wert(f.key) else 'aus' }}">geändert</span>{% endif %}</span>
+        </label>
+        {% if f.hilfe %}<p class="feld-hilfe">{{ f.hilfe }}</p>{% endif %}
+        {% else %}
+        <label class="feld">
+          <span>{{ f.titel }}{% if store.from_gui(f.key) %} <span class="marke-gui" title=".env: {{ store.env_wert(f.key) }}">geändert</span>{% endif %}</span>
+          <input type="number" name="{{ f.key }}" value="{{ store.anzeige_wert(f.key) }}" min="{{ f.minimum }}" max="{{ f.maximum }}" required inputmode="numeric">
+          {% if f.hilfe %}<small class="feld-hilfe">{{ f.hilfe }}</small>{% endif %}
+        </label>
+        {% endif %}
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+    <div class="knoepfe formular-voll">
+      <button type="submit" class="btn btn-primaer">Speichern</button>
+      <button type="button" class="btn btn-leise" hx-post="/einstellungen/zuruecksetzen" hx-target="#einstellungen-allgemein"
+              hx-confirm="Alle Werte auf die Vorgaben aus der .env zurücksetzen?">Auf .env zurücksetzen</button>
+      <span class="leise klein">„geändert“ = weicht von der .env ab. Das Aktualisierungsintervall greift nach dem Neuladen der Seite.</span>
+    </div>
+  </form>
+</section>

@@ -1,5 +1,8 @@
-{% from "_makros.html" import tabelle %}
+{% from "_makros.html" import tabelle with context %}
+{% if request.headers.get("HX-Request") %}
 {% if toast %}{% include "_toast.html" %}{% endif %}
+{% for t in toasts %}{% with toast = t %}{% include "_toast.html" %}{% endwith %}{% endfor %}
+{% endif %}
 
 {% if fehler %}
 <p class="meldung meldung-fehler" role="alert">{{ fehler }}</p>
@@ -9,6 +12,7 @@
   <div class="kennzahl"><span class="kennzahl-wert">{{ laufend }}</span><span class="kennzahl-text">laufen</span></div>
   <div class="kennzahl"><span class="kennzahl-wert">{{ gesamt - laufend }}</span><span class="kennzahl-text">gestoppt</span></div>
   <div class="kennzahl {% if auffaellig %}kennzahl-warnung{% endif %}"><span class="kennzahl-wert">{{ auffaellig|length }}</span><span class="kennzahl-text">auffällig</span></div>
+  {% if update_count %}<a class="kennzahl kennzahl-update" href="/updates"><span class="kennzahl-wert">{{ update_count }}</span><span class="kennzahl-text">Updates</span></a>{% endif %}
   <div class="stand leise">Stand {{ stand }}</div>
 </div>
 

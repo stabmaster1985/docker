@@ -2,38 +2,32 @@
 
 from __future__ import annotations
 
-import hashlib
 import hmac
 import secrets
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Callable
 
 from fastapi import Request
-
-from .config import Settings
-
-
-def _digest(wert: str) -> bytes:
-    return hashlib.sha256(wert.encode("utf-8")).digest()
-
-
-def check_credentials(settings: Settings, user: str, password: str) -> bool:
-    # Beide Vergleiche immer ausführen und in konstanter Zeit, damit die
-    # Antwortzeit nichts über Benutzername oder Passwort verrät.
-    user_ok = hmac.compare_digest(_digest(user), _digest(settings.username))
-    pass_ok = hmac.compare_digest(_digest(password), _digest(settings.password))
-    return user_ok and pass_ok
 
 
 class LoginLimiter:
     """Sperrt eine IP nach zu vielen Fehlversuchen für eine Weile."""
 
-    def __init__(self, max_attempts: int, lock_seconds: int) -> None:
-        self.max_attempts = max_attempts
-        self.lock_seconds = lock_seconds
+    def __init__(self, max_attempts: Callable[[], int], lock_seconds: Callable[[], int]) -> None:
+        self._max_attempts = max_attempts
+        self._lock_seconds = lock_seconds
         self._fails: dict[str, list[float]] = defaultdict(list)
         self._lock = threading.Lock()
+
+    @property
+    def max_attempts(self) -> int:
+        return self._max_attempts()
+
+    @property
+    def lock_seconds(self) -> int:
+        return self._lock_seconds()
 
     def _recent(self, ip: str, now: float) -> list[float]:
         versuche = [t for t in self._fails.get(ip, []) if now - t < self.lock_seconds]
@@ -63,8 +57,15 @@ class LoginLimiter:
             self._fails.pop(ip, None)
 
 
-def current_user(request: Request) -> str | None:
-    return request.session.get("user")
+def current_user(request: Request, max_age: int | None = None) -> str | None:
+    """Angemeldeter Benutzer; None, wenn die Sitzung abgelaufen ist."""
+    user = request.session.get("user")
+    if user and max_age is not None:
+        seit = time.time() - float(request.session.get("login_at", 0))
+        if seit > max_age:
+            request.session.clear()
+            return None
+    return user
 
 
 def csrf_token(request: Request) -> str:

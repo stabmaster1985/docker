@@ -14,7 +14,7 @@
     <tr class="{% if not e.ok %}zeile-auffaellig{% endif %}">
       <td data-label="Zeit">{{ e.zeit|zeitstempel }}</td>
       <td data-label="Benutzer">{{ e.benutzer }}</td>
-      <td data-label="Aktion">{{ ACTIONS.get(e.aktion, e.aktion) }}</td>
+      <td data-label="Aktion">{{ LOG_ACTIONS.get(e.aktion, e.aktion) }}</td>
       <td data-label="Container">{{ e.container }}</td>
       <td data-label="Ergebnis">
         <span class="punkt punkt-{{ 'gruen' if e.ok else 'rot' }}" aria-hidden="true"></span>{{ e.meldung }}

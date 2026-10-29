@@ -1,10 +1,11 @@
-{% from "_makros.html" import aktionen %}
+{% from "_makros.html" import aktionen, update_marke with context %}
 {% if toast %}{% include "_toast.html" %}{% endif %}
 <section class="detail-karte {% if c.auffaellig %}zeile-auffaellig{% endif %}">
   <div class="detail-titel">
     <span class="punkt punkt-{{ c.ampel }}" aria-hidden="true"></span>
     <h1>{{ c.name }}</h1>
     {% for p in c.problems %}<span class="marke-problem">{{ p }}</span>{% endfor %}
+    {{ update_marke(c) }}
     {{ aktionen(c, ziel="#detail-kopf") }}
   </div>
   <dl class="detail-raster">
@@ -14,6 +15,7 @@
     <div><dt>Restarts</dt><dd>{{ c.restart_count }}</dd></div>
     <div><dt>Image</dt><dd class="umbruch">{{ c.image_name }}:{{ c.image_tag }}</dd></div>
     <div><dt>Image-Alter</dt><dd>{{ c.image_alter }}</dd></div>
+    {% if c.update %}<div><dt>Image-Update</dt><dd class="update-{{ c.update.code }}">{{ c.update.text }}{% if c.update.geprueft %} <span class="leise">({{ c.update.geprueft|zeitstempel }})</span>{% endif %}</dd></div>{% endif %}
     <div><dt>CPU</dt><dd>{{ c.cpu_percent|prozent }}</dd></div>
     <div><dt>RAM</dt><dd>{{ c.mem_usage|bytes }}{% if c.mem_limit %} von {{ c.mem_limit|bytes }}{% endif %}</dd></div>
     <div><dt>Projekt</dt><dd>{{ c.project or "–" }}{% if c.service %} / {{ c.service }}{% endif %}</dd></div>

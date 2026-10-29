@@ -1,0 +1,54 @@
+{% if toast %}{% include "_toast.html" %}{% endif %}
+<section class="karte" data-leise data-laufende-version="{{ (version.commit or '')[:12] }}"
+  {% if status.beschaeftigt or status.auftrag_offen or status.phase == "umschalten" %}
+  hx-get="/partials/version" hx-trigger="every 3s" hx-target="#version"
+  {% endif %}>
+  <div class="karte-kopf">
+    <h2>Dashboard</h2>
+    <span class="leise">
+      Version
+      {% if laufend %}<code title="{{ laufend }}">{{ laufend[:7] }}</code>{% else %}unbekannt{% endif %}
+      {% if version.datum %}vom {{ version.datum|zeitstempel }}{% endif %}
+    </span>
+  </div>
+
+  {% if not status.verfuegbar %}
+    <div class="hinweis">
+      {% if status.veraltet %}
+      <p><strong>Der Update-Dienst meldet sich nicht mehr</strong> (zuletzt {{ status.zeit|zeitstempel }}).
+        Auf dem Server prüfen mit <code>systemctl status dashboard-updater.timer</code>.</p>
+      {% else %}
+      <p><strong>Der Update-Dienst ist nicht eingerichtet.</strong> Er läuft auf dem Server (nicht im Container),
+        holt neue Versionen und aktualisiert Container auf Knopfdruck. Einmalig im Ordner des Dashboards ausführen:</p>
+      {% endif %}
+      <pre class="befehl">sudo ./updater/install.sh</pre>
+    </div>
+  {% elif status.phase == "vorbereiten" or (status.auftrag_offen and status.phase != "umschalten") %}
+    <p class="status-zeile"><span class="lade-indikator htmx-request"></span>{{ status.meldung or "Suche nach einer neuen Version …" }}</p>
+  {% elif status.phase == "umschalten" %}
+    <p class="status-zeile"><span class="lade-indikator htmx-request"></span>{{ status.meldung }} Die Seite lädt danach von selbst neu.</p>
+  {% elif status.phase == "bereit" %}
+    <p class="status-zeile status-update"><strong>Neue Version {{ status.bereit[:7] }} ist bereit.</strong></p>
+    {% if status.commits %}
+    <ul class="commits">
+      {% for c in status.commits %}<li><code>{{ c.commit[:7] }}</code> {{ c.message }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    <div class="knoepfe">
+      <button type="button" class="btn btn-primaer" hx-post="/updates/dashboard/umschalten" hx-target="#version"
+              hx-confirm="Auf die neue Version umschalten? Das Dashboard ist dabei einige Sekunden nicht erreichbar. Startet die neue Version nicht sauber, kommt automatisch die alte zurück.">Jetzt aktualisieren</button>
+    </div>
+  {% else %}
+    {% if status.phase == "fehler" %}
+    <p class="meldung meldung-fehler">{{ status.meldung }}</p>
+    {% if status.log %}<details class="log-details"><summary>Protokoll</summary><pre class="log">{{ status.log }}</pre></details>{% endif %}
+    {% else %}
+    <p class="status-zeile">{{ status.meldung or "Die neueste Version läuft." }}
+      {% if status.zeit %}<span class="leise">Zuletzt geprüft {{ status.zeit|zeitstempel }}.</span>{% endif %}</p>
+    {% endif %}
+    <div class="knoepfe">
+      <button type="button" class="btn" hx-post="/updates/dashboard/pruefen" hx-target="#version">Jetzt prüfen</button>
+      <span class="leise">Der Dienst prüft außerdem stündlich von selbst und baut neue Versionen im Hintergrund vor.</span>
+    </div>
+  {% endif %}
+</section>

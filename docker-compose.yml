@@ -50,7 +50,12 @@ services:
       dashboard.protect: "true"
 
   dashboard:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
+        GIT_BRANCH: ${GIT_BRANCH:-}
+        GIT_DATE: ${GIT_DATE:-}
     image: docker-dashboard:latest
     restart: unless-stopped
     depends_on:
@@ -63,7 +68,8 @@ services:
       # BIND_ADDRESS z. B. auf die LAN- oder Tailscale-IP setzen
       - "${BIND_ADDRESS:-0.0.0.0}:${DASHBOARD_PORT:-8080}:8080"
     volumes:
-      - dashboard-data:/data
+      # Einstellungen, Aktionslog und der Austausch mit dem Update-Dienst auf dem Host
+      - ./data:/data
     networks:
       - socket
       - web
@@ -82,6 +88,3 @@ networks:
   socket:
     internal: true
   web: {}
-
-volumes:
-  dashboard-data:

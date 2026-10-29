@@ -12,7 +12,7 @@
   <script src="/static/htmx.min.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
-<body {% if user %}hx-headers='{"X-CSRF-Token": "{{ csrf }}"}'{% endif %}>
+<body data-version="{{ (version.commit or '')[:12] }}" {% if user %}hx-headers='{"X-CSRF-Token": "{{ csrf }}"}'{% endif %}>
   {% if user %}
   <header class="kopf">
     <a class="marke" href="/">
@@ -21,7 +21,9 @@
     </a>
     <nav>
       <a href="/" {% if request.url.path == "/" %}aria-current="page"{% endif %}>Übersicht</a>
+      <a href="/updates" {% if request.url.path == "/updates" %}aria-current="page"{% endif %}>Updates{% if hinweise %}<span class="nav-punkt" title="{{ hinweise }} Update(s) verfügbar"></span>{% endif %}</a>
       <a href="/aktionen" {% if request.url.path == "/aktionen" %}aria-current="page"{% endif %}>Aktionslog</a>
+      <a href="/einstellungen" {% if request.url.path == "/einstellungen" %}aria-current="page"{% endif %}>Einstellungen</a>
     </nav>
     <div class="kopf-rechts">
       <button type="button" class="icon-btn" id="theme-toggle" title="Hell/Dunkel umschalten" aria-label="Hell/Dunkel umschalten">
@@ -39,7 +41,9 @@
     {% block content %}{% endblock %}
   </main>
 
-  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="toasts" class="toasts" aria-live="polite">
+    {%- for t in toasts %}<div class="toast {{ 'toast-ok' if t.ok else 'toast-fehler' }}" role="status">{{ t.text }}</div>{% endfor -%}
+  </div>
 
   <dialog id="bestaetigen" class="dialog">
     <form method="dialog">

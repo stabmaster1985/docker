@@ -31,18 +31,20 @@
     el.textContent = text;
     box.appendChild(el);
   }
+  function toastAusblenden(t) {
+    t.addEventListener("click", function () { t.remove(); });
+    setTimeout(function () { t.classList.add("weg"); }, 7000);
+    setTimeout(function () { t.remove(); }, 7400);
+  }
   var toastBox = document.getElementById("toasts");
   if (toastBox) {
+    toastBox.querySelectorAll(".toast").forEach(toastAusblenden);
     new MutationObserver(function (mutations) {
       mutations.forEach(function (m) {
         m.addedNodes.forEach(function (n) {
           if (n.nodeType !== 1) return;
           var toasts = n.classList.contains("toast") ? [n] : n.querySelectorAll(".toast");
-          toasts.forEach(function (t) {
-            t.addEventListener("click", function () { t.remove(); });
-            setTimeout(function () { t.classList.add("weg"); }, 6000);
-            setTimeout(function () { t.remove(); }, 6400);
-          });
+          toasts.forEach(toastAusblenden);
         });
       });
     }).observe(toastBox, { childList: true, subtree: true });
@@ -73,8 +75,19 @@
     if (xhr.status === 401) return; // HX-Redirect zur Anmeldung übernimmt
     toast("Fehler " + xhr.status + ": " + (xhr.responseText || "Anfrage fehlgeschlagen").slice(0, 200), false);
   });
-  document.addEventListener("htmx:sendError", function () {
+  document.addEventListener("htmx:sendError", function (e) {
+    // Abfragen während eines Dashboard-Updates dürfen still scheitern.
+    if (e.detail.elt && e.detail.elt.closest("[data-leise]")) return;
     toast("Dashboard nicht erreichbar.", false);
+  });
+
+  // ------------------------------------------------- Nach Dashboard-Update neu laden
+  document.addEventListener("htmx:afterSwap", function (e) {
+    var v = e.detail.target && e.detail.target.querySelector("[data-laufende-version]");
+    var seite = document.body.dataset.version;
+    if (v && seite && v.dataset.laufendeVersion && v.dataset.laufendeVersion !== seite) {
+      window.location.reload();
+    }
   });
 
   // ------------------------------------------------- Laufende Requests

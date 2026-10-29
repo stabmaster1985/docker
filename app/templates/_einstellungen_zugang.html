@@ -1,0 +1,30 @@
+{% if toast %}{% include "_toast.html" %}{% endif %}
+<section class="karte">
+  <div class="karte-kopf"><h2>Zugang</h2></div>
+  <p class="leise klein">
+    {% if store.password_from_gui %}
+    Das Passwort wurde hier geändert und ist verschlüsselt (scrypt) im Datenordner gespeichert. Passwort vergessen?
+    Auf dem Server <code>data/zugang.json</code> löschen – dann gelten wieder die Zugangsdaten aus der .env.
+    {% else %}
+    Aktuell gelten Benutzername und Passwort aus der .env. Nach einer Änderung hier ist nur noch das neue Passwort gültig.
+    {% endif %}
+  </p>
+  <form class="formular-raster" hx-post="/einstellungen/zugang" hx-target="#einstellungen-zugang">
+    <label class="feld"><span>Benutzername</span>
+      <input name="benutzer" value="{{ store.username }}" autocomplete="username" required>
+    </label>
+    <label class="feld"><span>Aktuelles Passwort</span>
+      <input name="alt" type="password" autocomplete="current-password" required>
+    </label>
+    <label class="feld"><span>Neues Passwort</span>
+      <input name="neu" type="password" autocomplete="new-password" minlength="{{ PASSWORT_MIN }}" required>
+      <small class="feld-hilfe">mindestens {{ PASSWORT_MIN }} Zeichen</small>
+    </label>
+    <label class="feld"><span>Neues Passwort wiederholen</span>
+      <input name="neu2" type="password" autocomplete="new-password" minlength="{{ PASSWORT_MIN }}" required>
+    </label>
+    <div class="knoepfe formular-voll">
+      <button type="submit" class="btn btn-primaer">Zugangsdaten ändern</button>
+    </div>
+  </form>
+</section>

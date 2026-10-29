@@ -5,9 +5,9 @@
   <h1>Container</h1>
   <div class="werkzeuge">
     <input type="search" id="suche" placeholder="Container suchen …" aria-label="Container suchen">
-    <label class="schalter" title="Automatisch alle {{ refresh_seconds }} Sekunden aktualisieren">
+    <label class="schalter" title="Automatisch alle {{ s.refresh_seconds }} Sekunden aktualisieren">
       <input type="checkbox" id="auto-refresh" checked>
-      <span>Auto ({{ refresh_seconds }} s)</span>
+      <span>Auto ({{ s.refresh_seconds }} s)</span>
     </label>
     <button type="button" class="btn btn-leise" hx-get="/partials/liste" hx-target="#liste"
             hx-indicator="#lade" title="Jetzt aktualisieren">Aktualisieren</button>
@@ -16,7 +16,7 @@
 </div>
 
 <div id="liste" hx-get="/partials/liste" hx-trigger="auto-refresh" hx-indicator="#lade"
-     data-intervall="{{ refresh_seconds }}">
+     data-intervall="{{ s.refresh_seconds }}">
   {% include "_liste.html" %}
 </div>
 {% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Updates{% endblock %}
+{% block content %}
+<div class="werkzeugleiste">
+  <h1>Updates</h1>
+</div>
+
+<div id="version">
+  {% include "_version.html" %}
+</div>
+
+<div id="container-updates">
+  {% include "_container_updates.html" %}
+</div>
+{% endblock %}

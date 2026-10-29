@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen{% endblock %}
+{% block content %}
+<div class="werkzeugleiste">
+  <h1>Einstellungen</h1>
+  <span class="leise">gespeichert im Datenordner, gelten sofort</span>
+</div>
+
+<div id="einstellungen-allgemein">
+  {% include "_einstellungen_allgemein.html" %}
+</div>
+
+<section class="karte">
+  <div class="karte-kopf"><h2>Container ausblenden und schützen</h2></div>
+  <p class="leise klein">
+    <strong>Ausgeblendet</strong>: erscheint nicht in Übersicht und Updates und ist auch per Link nicht erreichbar.
+    <strong>Geschützt</strong>: Start, Stopp, Neustart und Update sind gesperrt.
+    Was per Label (<code>dashboard.hide</code>, <code>dashboard.protect</code>) festgelegt ist, lässt sich hier nicht
+    abschalten. Dashboard und Socket-Proxy sind immer geschützt.
+  </p>
+  {% if fehler %}
+  <p class="meldung meldung-fehler">{{ fehler }}</p>
+  {% else %}
+  <div class="tabelle-rahmen">
+  <table class="tabelle tabelle-schalter">
+    <thead><tr><th>Container</th><th>Projekt</th><th>Ausgeblendet</th><th>Geschützt</th></tr></thead>
+    <tbody>
+    {% for c in container %}
+      <tr>
+        <td data-label="Container" class="zelle-name">{{ c.name }}</td>
+        <td data-label="Projekt">{{ c.project or "–" }}</td>
+        {% set label_hidden = c.hidden_reason == "per Label" %}
+        <td data-label="Ausgeblendet" colspan="2" class="zelle-formular">
+          <form class="schalter-zeile" hx-post="/einstellungen/container" hx-trigger="change">
+            <input type="hidden" name="name" value="{{ c.name }}">
+            <label class="schalter" {% if label_hidden %}title="per Label ausgeblendet"{% endif %}>
+              <input type="checkbox" name="ausgeblendet" {% if c.hidden_reason %}checked{% endif %} {% if label_hidden %}disabled{% endif %}>
+              <span>{{ "per Label" if label_hidden else "ausblenden" }}</span>
+            </label>
+            <label class="schalter" {% if c.protected_fixed %}title="{{ c.protected_reason }}"{% endif %}>
+              <input type="checkbox" name="geschuetzt" {% if c.protected %}checked{% endif %} {% if c.protected_fixed %}disabled{% endif %}>
+              <span>{{ c.protected_reason if c.protected_fixed else "schützen" }}</span>
+            </label>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+
+<div id="einstellungen-zugang">
+  {% include "_einstellungen_zugang.html" %}
+</div>
+
+<section class="karte">
+  <div class="karte-kopf"><h2>Aktionslog</h2></div>
+  <div class="knoepfe">
+    <a class="btn" href="/aktionen">Ansehen</a>
+    <button type="button" class="btn btn-stop" hx-post="/einstellungen/aktionslog-leeren"
+            hx-confirm="Alle Einträge im Aktionslog löschen?">Leeren</button>
+  </div>
+</section>
+
+<section class="karte">
+  <div class="karte-kopf"><h2>Nur in der .env bzw. docker-compose.yml</h2></div>
+  <p class="leise klein">
+    Diese Werte braucht Docker, bevor das Dashboard läuft, oder sie sind aus Sicherheitsgründen absichtlich nicht
+    über die Oberfläche änderbar: Port und Bind-Adresse (<code>DASHBOARD_PORT</code>, <code>BIND_ADDRESS</code>),
+    <code>COOKIE_SECURE</code>, die Docker-API-Version (<code>DOCKER_API_VERSION</code>, aktuell
+    <code>{{ s.docker_api_version }}</code>) und die Rechte des Socket-Proxys.
+  </p>
+</section>
+{% endblock %}

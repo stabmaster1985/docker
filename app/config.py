@@ -1,13 +1,13 @@
-"""Einstellungen aus Umgebungsvariablen (.env via docker compose)."""
+"""Startwerte aus Umgebungsvariablen (.env via docker compose).
+
+Die meisten Werte lassen sich danach in der Oberfläche ändern (siehe store.py);
+die .env liefert dann nur noch die Vorgabe.
+"""
 
 from __future__ import annotations
 
-import logging
 import os
-import secrets
 from dataclasses import dataclass
-
-log = logging.getLogger("dashboard")
 
 
 def _bool(name: str, default: bool) -> bool:
@@ -42,6 +42,8 @@ class Settings:
     login_max_attempts: int
     login_lock_seconds: int
     stats_workers: int
+    update_check: bool = True
+    update_check_hours: int = 6
 
 
 def load_settings() -> Settings:
@@ -54,16 +56,11 @@ def load_settings() -> Settings:
     if password == "bitte-aendern":
         raise RuntimeError("Bitte DASHBOARD_PASSWORD in der .env ändern.")
 
-    secret = os.environ.get("SESSION_SECRET", "").strip()
-    if not secret:
-        # Funktioniert, aber jede Anmeldung verfällt beim Neustart des Containers.
-        log.warning("SESSION_SECRET nicht gesetzt – es wird ein zufälliger Schlüssel verwendet.")
-        secret = secrets.token_urlsafe(48)
-
     return Settings(
         username=username,
         password=password,
-        session_secret=secret,
+        # Leer = die App erzeugt einen Schlüssel und legt ihn in /data ab (store.py).
+        session_secret=os.environ.get("SESSION_SECRET", "").strip(),
         session_max_age=_int("SESSION_MAX_AGE", 12 * 3600),
         cookie_secure=_bool("COOKIE_SECURE", False),
         docker_host=os.environ.get("DOCKER_HOST", "tcp://socket-proxy:2375"),
@@ -79,4 +76,6 @@ def load_settings() -> Settings:
         login_max_attempts=_int("LOGIN_MAX_ATTEMPTS", 5),
         login_lock_seconds=_int("LOGIN_LOCK_SECONDS", 300),
         stats_workers=_int("STATS_WORKERS", 8),
+        update_check=_bool("UPDATE_CHECK", True),
+        update_check_hours=_int("UPDATE_CHECK_HOURS", 6),
     )

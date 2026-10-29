@@ -6,3 +6,6 @@
 tests
 data
 *.md
+updater
+installieren.sh
+requirements-dev.txt

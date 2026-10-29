@@ -15,12 +15,20 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Eigener Benutzer ohne Root-Rechte; /data gehört ihm, damit das Volume beschreibbar ist.
+# Eigener Benutzer ohne Root-Rechte (UID 10001); der Datenordner ./data muss ihm gehören
+# (legt installieren.sh an).
 RUN useradd --system --uid 10001 --home-dir /srv --shell /usr/sbin/nologin dashboard \
  && mkdir -p /data \
  && chown dashboard:dashboard /data
 
 COPY app ./app
+
+# Version für die Anzeige „Updates“ (setzen installieren.sh und der Update-Dienst)
+ARG GIT_COMMIT=""
+ARG GIT_BRANCH=""
+ARG GIT_DATE=""
+RUN python -c "import json, sys; json.dump({'commit': sys.argv[1], 'branch': sys.argv[2], 'datum': sys.argv[3]}, open('app/version.json', 'w'))" \
+      "$GIT_COMMIT" "$GIT_BRANCH" "$GIT_DATE"
 
 USER dashboard
 EXPOSE 8080
