@@ -117,6 +117,16 @@
     });
   }
 
+  // ------------------------------------------------- Ports ein-/ausblenden
+  var portsSchalter = document.getElementById("ports-anzeigen");
+  if (portsSchalter) {
+    portsSchalter.checked = lese("ports", "1") === "1";
+    portsSchalter.addEventListener("change", function () {
+      schreibe("ports", portsSchalter.checked ? "1" : "0");
+      document.documentElement.classList.toggle("ports-aus", !portsSchalter.checked);
+    });
+  }
+
   // ------------------------------------------------- Container-Suche
   var suche = document.getElementById("suche");
   function filtereContainer() {

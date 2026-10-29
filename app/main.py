@@ -18,7 +18,7 @@ from . import auth, fmt
 from .action_log import ActionLog
 from .config import Settings, load_settings
 from .docker_service import (ACTIONS, LOG_ACTIONS, DashboardError, DockerService,
-                             group_containers)
+                             group_containers, safe_url)
 from .image_updates import ImageUpdateChecker
 from .store import FELDER, PASSWORT_MIN, Store
 from .updater import UpdaterBridge, running_version
@@ -423,8 +423,18 @@ def create_app(settings: Settings | None = None, *, client=None, hostname: str |
             return Response("Name fehlt.", status_code=400)
         hidden = form.get("ausgeblendet") == "on"
         protected = form.get("geschuetzt") == "on"
-        store.set_container(name, hidden, protected)
+        link = None
+        if "link" in form:
+            link = form["link"].strip()
+            if link and not safe_url(link):
+                antwort = render(request, "_toast.html", toast={
+                    "ok": False, "text": "Der Link muss mit http:// oder https:// beginnen."})
+                antwort.headers["HX-Reswap"] = "none"
+                return antwort
+        store.set_container(name, hidden, protected, link)
         teile = [("ausgeblendet" if hidden else "sichtbar"), ("geschützt" if protected else "nicht geschützt")]
+        if link is not None:
+            teile.append(f"Link {link}" if link else "kein eigener Link")
         action_log.add(user, "container-einstellung", name, True, ", ".join(teile))
         antwort = render(request, "_toast.html", toast={"ok": True, "text": f"„{name}“: {', '.join(teile)}."})
         antwort.headers["HX-Reswap"] = "none"

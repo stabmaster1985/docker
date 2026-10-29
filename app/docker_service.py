@@ -25,6 +25,7 @@ LABEL_SERVICE = "com.docker.compose.service"
 LABEL_WORKDIR = "com.docker.compose.project.working_dir"
 LABEL_HIDE = "dashboard.hide"
 LABEL_PROTECT = "dashboard.protect"
+LABEL_URL = "dashboard.url"
 
 ACTIONS = {"start": "Start", "stop": "Stopp", "restart": "Neustart"}
 # Bezeichnungen fürs Aktionslog (Container-Aktionen und alles andere)
@@ -71,6 +72,75 @@ def split_image(ref: str) -> tuple[str, str]:
     return ref, "latest"
 
 
+def safe_url(wert: str | None) -> str | None:
+    """Nur http(s)-Links zulassen – nie „javascript:“ o. Ä. aus Labels oder Formularen."""
+    wert = (wert or "").strip()
+    if len(wert) > 500 or not re.match(r"^https?://[^\s/?#]+", wert, re.IGNORECASE):
+        return None
+    return wert
+
+
+WILDCARD_IPS = ("", "0.0.0.0", "::")
+HTTPS_PORTS = (443, 8443)
+
+
+@dataclass(frozen=True)
+class PortInfo:
+    host_ip: str  # "" = alle Adressen
+    host_port: int
+    container_port: int
+    proto: str
+
+    @property
+    def nur_lokal(self) -> bool:
+        return self.host_ip in ("127.0.0.1", "::1") or self.host_ip.startswith("127.")
+
+    @property
+    def titel(self) -> str:
+        wo = f"{self.host_ip}:" if self.host_ip else ""
+        text = f"Host {wo}{self.host_port} → Container {self.container_port}/{self.proto}"
+        return text + (" (nur lokal auf dem Server)" if self.nur_lokal else "")
+
+    def url(self, host: str | None) -> str | None:
+        """Link mit der Adresse, über die das Dashboard gerade aufgerufen wird."""
+        if self.proto != "tcp" or self.nur_lokal:
+            return None
+        ziel = self.host_ip or host
+        if not ziel:
+            return None
+        if ":" in ziel and not ziel.startswith("["):
+            ziel = f"[{ziel}]"  # IPv6
+        https = self.container_port in HTTPS_PORTS or self.host_port in HTTPS_PORTS
+        schema = "https" if https else "http"
+        port = "" if self.host_port == (443 if https else 80) else f":{self.host_port}"
+        return f"{schema}://{ziel}{port}"
+
+
+def parse_ports(attrs: dict) -> list[PortInfo]:
+    """Veröffentlichte Ports; bei gestoppten Containern aus der Konfiguration."""
+    ports = (attrs.get("NetworkSettings") or {}).get("Ports") or \
+        (attrs.get("HostConfig") or {}).get("PortBindings") or {}
+    gesehen: set[tuple] = set()
+    ergebnis = []
+    for schluessel, bindungen in ports.items():
+        if not bindungen:
+            continue  # nur EXPOSE, nicht veröffentlicht
+        cport, _, proto = schluessel.partition("/")
+        for b in bindungen:
+            hport = str(b.get("HostPort") or "")
+            if not hport.isdigit() or not cport.isdigit():
+                continue
+            ip = b.get("HostIp") or ""
+            ip = "" if ip in WILDCARD_IPS else ip
+            key = (ip, int(hport), proto or "tcp")
+            if key in gesehen:  # 0.0.0.0 und :: sind derselbe Port
+                continue
+            gesehen.add(key)
+            ergebnis.append(PortInfo(ip, int(hport), int(cport), proto or "tcp"))
+    ergebnis.sort(key=lambda p: (p.host_port, p.proto, p.host_ip))
+    return ergebnis
+
+
 class DashboardError(Exception):
     """Fehler mit Meldung für die Oberfläche."""
 
@@ -98,6 +168,9 @@ class ContainerInfo:
     hidden_reason: str | None = None
     update: object | None = None  # ImageStatus, wird von main.py gesetzt
     update_pending: bool = False
+    ports: list[PortInfo] = field(default_factory=list)
+    link: str | None = None
+    link_label: str | None = None  # aus dashboard.url, für die Einstellungsseite
     cpu_percent: float | None = None
     mem_usage: int | None = None
     mem_limit: int | None = None
@@ -320,6 +393,7 @@ class DockerService:
         name = self._name(c)
         health = (state.get("Health") or {}).get("Status")
         schutz, schutz_fest = self._protection(attrs, labels, image_ref, name)
+        link_label = safe_url(labels.get(LABEL_URL))
 
         info = ContainerInfo(
             id=c.id,
@@ -341,6 +415,10 @@ class DockerService:
             protected_reason=schutz,
             protected_fixed=schutz_fest,
             hidden_reason=self._hidden(c),
+            ports=parse_ports(attrs),
+            # Link aus den Einstellungen geht vor dem Label.
+            link=safe_url(self.store.links.get(name)) or link_label,
+            link_label=link_label,
         )
         info.problems = self._problems(info)
         return info

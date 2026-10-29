@@ -87,7 +87,7 @@ def test_einstellungen_zuruecksetzen(client, app):
 def test_einstellungsseite_rendert(client):
     eingeloggt(client)
     html = client.get("/einstellungen").text
-    assert "Container ausblenden und schützen" in html and "Zugang" in html
+    assert "Container: ausblenden, schützen, Link" in html and "Zugang" in html
     assert "geheim" in html  # auch ausgeblendete Container sind dort aufgeführt
 
 
