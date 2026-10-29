@@ -415,3 +415,50 @@ ul.meldung { margin: 0 0 1rem; padding-left: 2rem; }
   .tabelle-schalter td.zelle-formular::before { display: none; }
   .formular-raster { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------ Ports und Links */
+.ports { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .3rem; font-weight: 400; }
+html.ports-aus .ports:not(.ports-immer) { display: none; }
+.ports-immer { margin-top: 0; }
+.port {
+  display: inline-block;
+  padding: .05rem .5rem; border-radius: 999px;
+  font: .75rem/1.5 var(--mono);
+  color: var(--akzent); background: var(--flaeche-2); border: 1px solid var(--rand);
+}
+a.port:hover { border-color: var(--akzent); text-decoration: none; }
+.port-aus { color: var(--text-leise); }
+.port-link { font-family: inherit; font-weight: 600; }
+.detail-breit { grid-column: 1 / -1; }
+.link-feld {
+  flex: 1 1 14rem; min-width: 0;
+  font: inherit; font-size: .85rem;
+  padding: .3rem .55rem;
+  border: 1px solid var(--rand); border-radius: 7px;
+  background: var(--bg); color: var(--text);
+}
+
+/* ------------------------------------- Handy: Karten in zwei Spalten */
+@media (max-width: 900px) {
+  .tabelle tr { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.25rem; row-gap: .1rem; }
+  .tabelle td { min-width: 0; font-size: .85rem; }
+  .tabelle td::before { font-size: .75rem; }
+  .tabelle td.zelle-name,
+  .tabelle td.zelle-image,
+  .tabelle td.zelle-formular,
+  .tabelle td[data-label="Aktionen"],
+  .tabelle td[data-label="Aktion"],
+  .tabelle td[data-label="Ergebnis"] { grid-column: 1 / -1; }
+  .tabelle td.zelle-name { font-size: 1rem; }
+  .tabelle td.mobil-aus { display: none; }
+  /* Halbe Spalten: Bezeichnung klein über dem Wert */
+  .tabelle td:not(.zelle-name):not(.zelle-image):not(.zelle-formular):not([data-label="Aktionen"]):not([data-label="Aktion"]):not([data-label="Ergebnis"]):not([colspan]) {
+    flex-direction: column; align-items: flex-start; gap: 0;
+    text-align: left; padding: .2rem 0; white-space: normal;
+  }
+  .tabelle td.zahl { justify-content: flex-start; }
+  .balken { margin: .2rem 0 0; }
+  .tabelle td[colspan] { grid-column: 1 / -1; }
+  .ports { margin-top: .35rem; }
+  .port { font-size: .8rem; padding: .15rem .6rem; }
+}

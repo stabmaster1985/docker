@@ -20,6 +20,7 @@ Außerdem gibt es Updates für Container und für das Dashboard selbst per Knopf
 |---|---|
 | Übersicht | Alle Container, gruppiert nach Compose-Projekt (`com.docker.compose.project`) |
 | Pro Container | Name, Status, Health, Laufzeit, Restart-Anzahl, Image und Tag, Image-Alter, CPU, RAM |
+| **Ports und Links** | Veröffentlichte Ports als anklickbare Chips, dazu optional ein eigener Link („Öffnen ↗“); per Schalter „Ports“ ausblendbar |
 | Auffällig | Block ganz oben für **beendete**, **ungesunde** und Container in einer **Restart-Schleife** |
 | Aktionen | Start, Stopp und Neustart mit Bestätigungsdialog; das Ergebnis erscheint als Hinweis |
 | Logs | Detailansicht mit den letzten 200 Zeilen, Filterfeld und Zeilenumbruch-Schalter |
@@ -225,6 +226,21 @@ docker compose pull socket-proxy && docker compose up -d
 
 ---
 
+## Ports und Links
+
+Zu jedem Container zeigt die Übersicht die **veröffentlichten Ports** (`ports:` in Compose) als kleine Chips:
+
+- Ein Klick öffnet `http://<Adresse>:<Port>` in einem neuen Tab. Als Adresse dient die, über die du das Dashboard gerade
+  aufrufst (LAN-IP, Tailscale-Name …). Ist ein Port an eine bestimmte IP gebunden, wird diese verwendet.
+- Ports `443` und `8443` werden als `https://` verlinkt.
+- Grau und nicht anklickbar: UDP-Ports, nur lokal gebundene Ports (`127.0.0.1:…`) und Ports gestoppter Container.
+- **Eigener Link** „Öffnen ↗“ (z. B. die Adresse hinter einem Reverse-Proxy): per Label `dashboard.url` oder unter
+  **Einstellungen** je Container. Der Eintrag in den Einstellungen geht vor. Erlaubt sind nur `http://` und `https://`.
+- Der Schalter **„Ports“** oben in der Übersicht blendet die Chips aus, etwa auf dem Handy. Die Einstellung merkt sich der
+  Browser. In der Detailansicht eines Containers sind Ports und Link immer zu sehen.
+
+---
+
 ## Labels für andere Container
 
 In der `docker-compose.yml` des jeweiligen Projekts:
@@ -239,6 +255,10 @@ services:
     image: irgendwas
     labels:
       dashboard.hide: "true"      # taucht im Dashboard nicht auf, auch nicht per Direkt-URL
+  fotos:
+    image: ghcr.io/immich-app/immich-server:release
+    labels:
+      dashboard.url: "https://fotos.example.lan"   # Link „Öffnen ↗“, z. B. hinter einem Reverse-Proxy
 ```
 
 Labels werden erst wirksam, wenn der Container neu erstellt wird (`docker compose up -d`).
@@ -273,6 +293,7 @@ Zum Sichern genügt es, ihn zusammen mit der `.env` zu kopieren.
 | Aktionen liefern „403 Forbidden“ | Proxy-Version unterstützt `ALLOW_START`, `ALLOW_STOP` oder `ALLOW_RESTARTS` nicht. Aktuelleren `SOCKET_PROXY_TAG` verwenden. |
 | „Update-Dienst ist nicht eingerichtet“ | `sudo ./updater/install.sh` im Ordner des Dashboards ausführen |
 | „Update-Dienst meldet sich nicht mehr“ | `systemctl status dashboard-updater.timer` prüfen; Protokoll in `data/updater/update.log` |
+| „Dateien von Hand geändert: …“ beim Update | Im Ordner wurde eine Datei aus dem Repository geändert (z. B. `docker-compose.yml`). Mit `git checkout -- <datei>` zurücksetzen und erneut aktualisieren. Eigene Werte gehören in die `.env` oder in die Oberfläche. |
 | „Lokaler Stand weicht von GitHub ab“ | Auf dem Server wurde im Ordner etwas geändert: `git status`, Änderungen sichern, dann `git reset --hard origin/main` |
 | Update-Prüfung: „Abruf-Limit erreicht“ | Docker Hub begrenzt Abfragen. Intervall unter Einstellungen erhöhen. |
 | CPU zeigt „–“ | Container läuft nicht, oder der Daemon hat noch keinen Vergleichswert geliefert. |

@@ -36,6 +36,19 @@
 </div>
 {%- endmacro %}
 
+{% macro ports(c, immer=false) -%}
+{% if c.link or c.ports %}
+<div class="ports{% if immer %} ports-immer{% endif %}">
+  {% if c.link %}<a class="port port-link" href="{{ c.link }}" target="_blank" rel="noopener noreferrer" title="{{ c.link }}">Öffnen ↗</a>{% endif %}
+  {% for p in c.ports %}
+    {% set url = p.url(request.url.hostname) %}
+    {% if url and c.running %}<a class="port" href="{{ url }}" target="_blank" rel="noopener noreferrer" title="{{ p.titel }}">{{ p.host_port }}</a>
+    {% else %}<span class="port port-aus" title="{{ p.titel }}{% if not c.running %} – Container läuft nicht{% endif %}">{{ p.host_port }}{% if p.proto != "tcp" %}/{{ p.proto }}{% endif %}</span>{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}
+
 {% macro update_marke(c) -%}
 {% if c.update and c.update.hat_update %}<a class="marke-update" href="/updates" title="{{ c.update.text }}">{{ "Update" if c.update.code == "update" else "Neustart nötig" }}</a>{% endif %}
 {%- endmacro %}
@@ -47,17 +60,18 @@
     <a href="/container/{{ c.id }}" title="Details und Logs">{{ c.name }}</a>
     {% for p in c.problems %}<span class="marke-problem">{{ p }}</span>{% endfor %}
     {{ update_marke(c) }}
+    {{ ports(c) }}
   </td>
   <td data-label="Status">{{ c.status_text }}</td>
-  <td data-label="Health" class="health-{{ c.health or 'keine' }}">{{ c.health_text }}</td>
+  <td data-label="Health" class="health-{{ c.health or 'keine' }}{% if not c.health %} mobil-aus{% endif %}">{{ c.health_text }}</td>
   <td data-label="Laufzeit">{{ c.laufzeit }}</td>
-  <td data-label="Restarts" class="zahl">{{ c.restart_count }}</td>
+  <td data-label="Restarts" class="zahl{% if not c.restart_count %} mobil-aus{% endif %}">{{ c.restart_count }}</td>
   <td data-label="Image" class="zelle-image" title="{{ c.image_name }}:{{ c.image_tag }}">
     <span class="image-name">{{ c.image_name }}</span><span class="image-tag">{{ c.image_tag }}</span>
   </td>
   <td data-label="Image-Alter">{{ c.image_alter }}</td>
-  <td data-label="CPU" class="zahl">{{ c.cpu_percent|prozent }}</td>
-  <td data-label="RAM" class="zahl" {% if c.mem_limit %}title="von {{ c.mem_limit|bytes }}"{% endif %}>
+  <td data-label="CPU" class="zahl{% if c.cpu_percent is none %} mobil-aus{% endif %}">{{ c.cpu_percent|prozent }}</td>
+  <td data-label="RAM" class="zahl{% if c.mem_usage is none %} mobil-aus{% endif %}" {% if c.mem_limit %}title="von {{ c.mem_limit|bytes }}"{% endif %}>
     {{ c.mem_usage|bytes }}
     {% if c.mem_percent is not none %}
     <meter class="balken" min="0" max="100" low="70" high="90" optimum="0" value="{{ '%.1f'|format(c.mem_percent) }}" aria-label="RAM-Anteil am Limit"></meter>

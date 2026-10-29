@@ -25,7 +25,7 @@ def iso(dt: datetime) -> str:
 class FakeContainer:
     def __init__(self, cid, name, status="running", labels=None, image="nginx:1.27",
                  health=None, restart_count=0, exit_code=0, started_ago=3600, hostname=None,
-                 image_id=None):
+                 image_id=None, ports=None):
         jetzt = datetime.now(timezone.utc)
         self.short = cid
         self.id = hex_id(cid)
@@ -47,6 +47,7 @@ class FakeContainer:
             "RestartCount": restart_count,
             "Image": image_id or "sha256:img-" + image,
             "Config": {"Image": image, "Labels": self.labels, "Hostname": hostname or self.id[:12]},
+            "NetworkSettings": {"Ports": ports or {}},
         }
 
     def start(self):

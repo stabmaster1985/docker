@@ -41,9 +41,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - socket
-    read_only: true
-    tmpfs:
-      - /run
+    # Kein read_only: das Proxy-Image schreibt beim Start seine HAProxy-Konfiguration
+    # und startet mit schreibgeschütztem Dateisystem nicht.
     security_opt:
       - no-new-privileges:true
     labels:

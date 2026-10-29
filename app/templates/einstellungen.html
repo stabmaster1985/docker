@@ -11,26 +11,29 @@
 </div>
 
 <section class="karte">
-  <div class="karte-kopf"><h2>Container ausblenden und schützen</h2></div>
+  <div class="karte-kopf"><h2>Container: ausblenden, schützen, Link</h2></div>
   <p class="leise klein">
     <strong>Ausgeblendet</strong>: erscheint nicht in Übersicht und Updates und ist auch per Link nicht erreichbar.
     <strong>Geschützt</strong>: Start, Stopp, Neustart und Update sind gesperrt.
     Was per Label (<code>dashboard.hide</code>, <code>dashboard.protect</code>) festgelegt ist, lässt sich hier nicht
     abschalten. Dashboard und Socket-Proxy sind immer geschützt.
+    <strong>Link</strong>: eigene Adresse für „Öffnen ↗“, z. B. hinter einem Reverse-Proxy
+    (<code>https://fotos.example.lan</code>). Ohne Eintrag gilt das Label <code>dashboard.url</code>;
+    die Ports werden immer zusätzlich angezeigt.
   </p>
   {% if fehler %}
   <p class="meldung meldung-fehler">{{ fehler }}</p>
   {% else %}
   <div class="tabelle-rahmen">
   <table class="tabelle tabelle-schalter">
-    <thead><tr><th>Container</th><th>Projekt</th><th>Ausgeblendet</th><th>Geschützt</th></tr></thead>
+    <thead><tr><th>Container</th><th>Projekt</th><th>Ausgeblendet</th><th>Geschützt</th><th>Link</th></tr></thead>
     <tbody>
     {% for c in container %}
       <tr>
         <td data-label="Container" class="zelle-name">{{ c.name }}</td>
         <td data-label="Projekt">{{ c.project or "–" }}</td>
         {% set label_hidden = c.hidden_reason == "per Label" %}
-        <td data-label="Ausgeblendet" colspan="2" class="zelle-formular">
+        <td data-label="Ausgeblendet" colspan="3" class="zelle-formular">
           <form class="schalter-zeile" hx-post="/einstellungen/container" hx-trigger="change">
             <input type="hidden" name="name" value="{{ c.name }}">
             <label class="schalter" {% if label_hidden %}title="per Label ausgeblendet"{% endif %}>
@@ -41,6 +44,8 @@
               <input type="checkbox" name="geschuetzt" {% if c.protected %}checked{% endif %} {% if c.protected_fixed %}disabled{% endif %}>
               <span>{{ c.protected_reason if c.protected_fixed else "schützen" }}</span>
             </label>
+            <input type="url" name="link" class="link-feld" value="{{ store.links.get(c.name, '') }}"
+                   placeholder="{{ c.link_label or 'https://…' }}" aria-label="Link für {{ c.name }}" maxlength="500">
           </form>
         </td>
       </tr>

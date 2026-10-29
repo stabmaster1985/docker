@@ -5,6 +5,10 @@
   <h1>Container</h1>
   <div class="werkzeuge">
     <input type="search" id="suche" placeholder="Container suchen …" aria-label="Container suchen">
+    <label class="schalter" title="Ports und Links bei den Containern anzeigen">
+      <input type="checkbox" id="ports-anzeigen" checked>
+      <span>Ports</span>
+    </label>
     <label class="schalter" title="Automatisch alle {{ s.refresh_seconds }} Sekunden aktualisieren">
       <input type="checkbox" id="auto-refresh" checked>
       <span>Auto ({{ s.refresh_seconds }} s)</span>

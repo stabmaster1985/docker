@@ -104,6 +104,7 @@ class Store:
         daten.setdefault("werte", {})
         daten.setdefault("ausgeblendet", [])
         daten.setdefault("geschuetzt", [])
+        daten.setdefault("links", {})
         return daten
 
     def _build(self) -> Settings:
@@ -178,12 +179,23 @@ class Store:
     def protected_names(self) -> frozenset[str]:
         return frozenset(self._daten["geschuetzt"])
 
-    def set_container(self, name: str, hidden: bool, protected: bool) -> None:
+    @property
+    def links(self) -> dict[str, str]:
+        return dict(self._daten["links"])
+
+    def set_container(self, name: str, hidden: bool, protected: bool,
+                      link: str | None = None) -> None:
+        """link: None = unverändert, "" = entfernen, sonst bereits geprüfte URL."""
         with self._lock:
             for key, an in (("ausgeblendet", hidden), ("geschuetzt", protected)):
                 namen = set(self._daten[key])
                 namen.add(name) if an else namen.discard(name)
                 self._daten[key] = sorted(namen)
+            if link is not None:
+                if link:
+                    self._daten["links"][name] = link
+                else:
+                    self._daten["links"].pop(name, None)
             self._save()
 
     # --------------------------------------------------------------- Zugang
