@@ -154,6 +154,13 @@ apply() {
     write_status "fehler" "Es ist keine Version vorbereitet."; return 1
   fi
   cur="$(git rev-parse HEAD)"
+  # Von Hand geänderte Dateien aus dem Repository würden das Umschalten blockieren
+  # (Einstellungen gehören in die .env bzw. die Oberfläche).
+  geaendert="$(git diff --name-only HEAD 2>/dev/null | tr '\n' ' ')"
+  if [ -n "$geaendert" ]; then
+    write_status "fehler" "Auf dem Server wurden Dateien von Hand geändert: ${geaendert}– bitte zurücksetzen mit: git checkout -- ${geaendert}" "$new"
+    return 1
+  fi
   write_status "umschalten" "Schalte auf ${new:0:7} um …" "$new"
   log "== Umschalten $cur -> $new"
   docker tag "$IMAGE:latest" "$IMAGE:vorher" 2>/dev/null || true

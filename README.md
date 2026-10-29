@@ -293,6 +293,7 @@ Zum Sichern genügt es, ihn zusammen mit der `.env` zu kopieren.
 | Aktionen liefern „403 Forbidden“ | Proxy-Version unterstützt `ALLOW_START`, `ALLOW_STOP` oder `ALLOW_RESTARTS` nicht. Aktuelleren `SOCKET_PROXY_TAG` verwenden. |
 | „Update-Dienst ist nicht eingerichtet“ | `sudo ./updater/install.sh` im Ordner des Dashboards ausführen |
 | „Update-Dienst meldet sich nicht mehr“ | `systemctl status dashboard-updater.timer` prüfen; Protokoll in `data/updater/update.log` |
+| „Dateien von Hand geändert: …“ beim Update | Im Ordner wurde eine Datei aus dem Repository geändert (z. B. `docker-compose.yml`). Mit `git checkout -- <datei>` zurücksetzen und erneut aktualisieren. Eigene Werte gehören in die `.env` oder in die Oberfläche. |
 | „Lokaler Stand weicht von GitHub ab“ | Auf dem Server wurde im Ordner etwas geändert: `git status`, Änderungen sichern, dann `git reset --hard origin/main` |
 | Update-Prüfung: „Abruf-Limit erreicht“ | Docker Hub begrenzt Abfragen. Intervall unter Einstellungen erhöhen. |
 | CPU zeigt „–“ | Container läuft nicht, oder der Daemon hat noch keinen Vergleichswert geliefert. |
